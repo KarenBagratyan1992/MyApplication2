@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
@@ -7,8 +8,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.whenResumed
 import androidx.lifecycle.whenStarted
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.RecyclerView.LayoutManager
 import androidx.recyclerview.widget.RecyclerView.Recycler
 import com.example.myapplication.databinding.FragmentUserBinding
 import kotlinx.coroutines.*
@@ -33,8 +37,9 @@ class UserFragment : Fragment() {
 
 
         userDataAdapter = RecyclerAdapter()
-        val recycler = view.findViewById<RecyclerView>(R.id.recycler)
+        val recycler = binding?.recycler
         recycler?.adapter = userDataAdapter
+        recycler?.layoutManager = LinearLayoutManager(requireContext(),LinearLayoutManager.VERTICAL,false)
 
         getData()
 
@@ -43,33 +48,28 @@ class UserFragment : Fragment() {
     private fun getData() {
         val api = RetrofitService.retrofit.create(UserApi::class.java)
 
+       viewLifecycleOwner.lifecycleScope.launch {
+           withContext(Dispatchers.IO){
+               try {
+                   val response: List<UserUIModel> = api.getApi().map {
+                       UserUIModel(
+                           name = it.name.orEmpty(),
+                           id = it.id ?: 0,
+                           email = it.email.orEmpty(),
+                           gender = it.gender.orEmpty(),
+                           status = it.status.orEmpty()
+                       )
+                   }
+                   withContext(Dispatchers.Main){
+                       userDataAdapter?.submitList(response)
+                   }
 
-       viewLifecycleOwner.lifecycleScope.launch() {
-            (Dispatchers.IO)
-
-            delay(1500)
-            try {
-                val response: List<UserUIModel> = api.getApi().map {
-                    UserUIModel(
-                        name = it.name.orEmpty(),
-                        id = it.id ?: 0,
-                        email = it.email.orEmpty(),
-                        gender = it.gender.orEmpty(),
-                        status = it.status.orEmpty()
-                    )
-                }
-
-                lifecycle.whenStarted {
-                    Dispatchers.Main
-
-                        userDataAdapter?.submitList(response)
+               } catch (e: Exception) {
+                   Log.d("Appd", "${e}")
+               }
+           }
 
 
-                }
-
-            } catch (e: Exception) {
-                Log.d("Appd", "${e}")
-            }
         }
     }
 }
